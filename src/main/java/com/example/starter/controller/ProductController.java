@@ -1,11 +1,12 @@
 package com.example.starter.controller;
 
+
 import com.example.starter.dto.CreateProductRequest;
 import com.example.starter.dto.PagedResponse;
 import com.example.starter.dto.ProductResponse;
 import com.example.starter.dto.UpdateProductRequest;
+import com.example.starter.mapper.ProductMapper;
 import com.example.starter.service.ProductService;
-import com.example.starter.domain.model.Product;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -26,60 +27,51 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductMapper productMapper;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService, ProductMapper productMapper) {
         this.productService = productService;
+        this.productMapper = productMapper;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ProductResponse create(@Valid @RequestBody CreateProductRequest request) {
-        Product created = productService.create(request.name(), request.description(), request.price());
-        return toResponse(created);
+        return productMapper.toResponse(productService.create(request));
     }
 
     @PutMapping("/{id}")
-    public ProductResponse update(@PathVariable Long id, @Valid @RequestBody UpdateProductRequest request) {
-        Product updated = productService.update(id, request.name(), request.description(), request.price(), request.version());
-        return toResponse(updated);
+    public ProductResponse update(@PathVariable Long id,
+                                  @Valid @RequestBody UpdateProductRequest request) {
+        return productMapper.toResponse(productService.update(id, request));
     }
 
     @GetMapping("/{id}")
     public ProductResponse findById(@PathVariable Long id) {
-        Product product = productService.findById(id);
-        return toResponse(product);
+        return productMapper.toResponse(productService.findById(id));
     }
 
     @GetMapping
     public PagedResponse<ProductResponse> list(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "ASC") String direction,
-            @RequestParam(required = false) String name
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size,
+        @RequestParam(defaultValue = "id") String sortBy,
+        @RequestParam(defaultValue = "ASC") String direction,
+        @RequestParam(required = false) String name
     ) {
-        Sort.Direction sortDirection = "DESC".equalsIgnoreCase(direction) ? Sort.Direction.DESC : Sort.Direction.ASC;
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
-        Page<Product> result = productService.list(name, pageRequest);
+        Sort.Direction sortDirection = "DESC".equalsIgnoreCase(direction)
+            ? Sort.Direction.DESC
+            : Sort.Direction.ASC;
+
+        Page<ProductResponse> result = productService
+            .list(name, PageRequest.of(page, size, Sort.by(sortDirection, sortBy)))
+            .map(productMapper::toResponse);
 
         return new PagedResponse<>(
-                result.getContent().stream().map(this::toResponse).toList(),
-                result.getTotalElements(),
-                result.getNumber(),
-                result.getSize()
-        );
-    }
-
-    private ProductResponse toResponse(Product product) {
-        return new ProductResponse(
-                product.id(),
-                product.name(),
-                product.description(),
-                product.price(),
-                product.version()
+            result.getContent(),
+            result.getTotalElements(),
+            result.getNumber(),
+            result.getSize()
         );
     }
 }
-
-
-
